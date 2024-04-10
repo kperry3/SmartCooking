@@ -1,12 +1,11 @@
 /***************************************************
- DFPlayer - A Mini MP3 Player For Arduino
- <https://www.dfrobot.com/product-1121.html>
+DFPlayer - A Mini MP3 Player For Arduino
+ <https://www.dfrobot.com/index.php?route=product/product&product_id=1121>
  
  ***************************************************
  This example shows the basic function of library for DFPlayer.
  
  Created 2016-12-07
- Modified 2018-08-15
  By [Angelo qiao](Angelo.qiao@dfrobot.com)
  
  GNU Lesser General Public License.
@@ -21,66 +20,41 @@
  ****************************************************/
 
 #include "Arduino.h"
+#include "SoftwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
 
-#if (defined(ARDUINO_AVR_UNO) || defined(ESP8266))   // Using a soft serial port
-#include <SoftwareSerial.h>
-SoftwareSerial softSerial(/*rx =*/4, /*tx =*/5);
-#define FPSerial softSerial
-#else
-#define FPSerial Serial1
-#endif
-
+SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 
 void setup()
 {
-#if (defined ESP32)
-  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/D3, /*tx =*/D2);
-#else
-  FPSerial.begin(9600);
-#endif
-
+  mySoftwareSerial.begin(9600);
   Serial.begin(115200);
-
+  
   Serial.println();
   Serial.println(F("DFRobot DFPlayer Mini Demo"));
   Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
   
-  if (!myDFPlayer.begin(FPSerial, /*isACK = */true, /*doReset = */true)) {  //Use serial to communicate with mp3.
+  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
     Serial.println(F("Unable to begin:"));
     Serial.println(F("1.Please recheck the connection!"));
-    Serial.println(F("2.Please insert the SD card or USB drive!"));
-    while(true){
-      delay(0); // Code to compatible with ESP8266 watch dog.
-    }
+    Serial.println(F("2.Please insert the SD card!"));
+    while(true);
   }
   Serial.println(F("DFPlayer Mini online."));
+  
+  myDFPlayer.volume(10);  //Set volume value. From 0 to 30
+  myDFPlayer.play(1);  //Play the first mp3
 }
 
 void loop()
 {
   static unsigned long timer = millis();
-
+  
   if (millis() - timer > 3000) {
     timer = millis();
-    
-    int value;
-
-//    value = myDFPlayer.readState(); //read mp3 state
-//    value = myDFPlayer.readVolume(); //read current volume
-//    value = myDFPlayer.readEQ(); //read EQ setting
-//    value = myDFPlayer.readFileCounts(); //read all file counts in SD card
-//    value = myDFPlayer.readCurrentFileNumber(); //read current play file number
-    value = myDFPlayer.readFileCountsInFolder(3); //read file counts in folder SD:/03
-    
-    if (value == -1) {  //Error while Reading.
-      printDetail(myDFPlayer.readType(), myDFPlayer.read());
-    }
-    else{ //Successfully get the result.
-      Serial.println(value);
-    }
+    myDFPlayer.next();  //Play next mp3 every 3 second.
   }
   
   if (myDFPlayer.available()) {
@@ -104,12 +78,6 @@ void printDetail(uint8_t type, int value){
       break;
     case DFPlayerCardOnline:
       Serial.println(F("Card Online!"));
-      break;
-    case DFPlayerUSBInserted:
-      Serial.println("USB Inserted!");
-      break;
-    case DFPlayerUSBRemoved:
-      Serial.println("USB Removed!");
       break;
     case DFPlayerPlayFinished:
       Serial.print(F("Number:"));
@@ -147,5 +115,5 @@ void printDetail(uint8_t type, int value){
     default:
       break;
   }
-  
+
 }

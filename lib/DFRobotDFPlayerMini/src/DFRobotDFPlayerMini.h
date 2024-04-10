@@ -7,11 +7,11 @@
  * @copyright	GNU Lesser General Public License
  *
  * @author [Angelo](Angelo.qiao@dfrobot.com)
- * @version  V1.0.6
+ * @version  V1.0
  * @date  2016-12-07
  */
 
-#include "Arduino.h"
+#include "Particle.h"
 
 #ifndef DFRobotDFPlayerMini_cpp
     #define DFRobotDFPlayerMini_cpp
@@ -42,11 +42,6 @@
 #define DFPlayerCardOnline 4
 #define DFPlayerPlayFinished 5
 #define DFPlayerError 6
-#define DFPlayerUSBInserted 7
-#define DFPlayerUSBRemoved 8
-#define DFPlayerUSBOnline 9
-#define DFPlayerCardUSBOnline 10
-#define DFPlayerFeedBack 11
 
 #define Busy 1
 #define Sleeping 2
@@ -110,9 +105,9 @@ class DFRobotDFPlayerMini {
 
   uint8_t readCommand();
   
-  bool begin(Stream& stream, bool isACK = true, bool doReset = true);
+  bool begin(Stream& stream, bool isACK = true);
   
-  bool waitAvailable(unsigned long duration = 0);
+  bool waitAvailable();
   
   bool available();
   
@@ -182,7 +177,7 @@ class DFRobotDFPlayerMini {
   
   int readVolume();
   
-  int readEQ();
+  uint8_t readEQ();
   
   int readFileCounts(uint8_t device);
   
@@ -191,8 +186,6 @@ class DFRobotDFPlayerMini {
   int readFileCountsInFolder(int folderNumber);
   
   int readFileCounts();
-
-  int readFolderCounts();
   
   int readCurrentFileNumber();
   

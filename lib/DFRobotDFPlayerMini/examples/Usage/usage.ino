@@ -1,6 +1,6 @@
 /***************************************************
 DFPlayer - A Mini MP3 Player For Arduino
- <https://www.dfrobot.com/product-1121.html>
+ <https://www.dfrobot.com/index.php?route=product/product&product_id=1121>
  
  ***************************************************
  This example shows the basic function of library for DFPlayer.
@@ -20,40 +20,27 @@ DFPlayer - A Mini MP3 Player For Arduino
  ****************************************************/
 
 #include "Arduino.h"
+#include "SoftwareSerial.h"
 #include "DFRobotDFPlayerMini.h"
 
-#if (defined(ARDUINO_AVR_UNO) || defined(ESP8266))   // Using a soft serial port
-#include <SoftwareSerial.h>
-SoftwareSerial softSerial(/*rx =*/4, /*tx =*/5);
-#define FPSerial softSerial
-#else
-#define FPSerial Serial1
-#endif
-
+SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 
 void setup()
 {
-#if (defined ESP32)
-  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/D3, /*tx =*/D2);
-#else
-  FPSerial.begin(9600);
-#endif
-
+  mySoftwareSerial.begin(9600);
   Serial.begin(115200);
-
+  
   Serial.println();
   Serial.println(F("DFRobot DFPlayer Mini Demo"));
   Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
   
-  if (!myDFPlayer.begin(FPSerial, /*isACK = */true, /*doReset = */true)) {  //Use serial to communicate with mp3.
+  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
     Serial.println(F("Unable to begin:"));
     Serial.println(F("1.Please recheck the connection!"));
     Serial.println(F("2.Please insert the SD card!"));
-    while(true){
-      delay(0); // Code to compatible with ESP8266 watch dog.
-    }
+    while(true);
   }
   Serial.println(F("DFPlayer Mini online."));
   
@@ -92,12 +79,6 @@ void printDetail(uint8_t type, int value){
     case DFPlayerCardOnline:
       Serial.println(F("Card Online!"));
       break;
-    case DFPlayerUSBInserted:
-      Serial.println("USB Inserted!");
-      break;
-    case DFPlayerUSBRemoved:
-      Serial.println("USB Removed!");
-      break;
     case DFPlayerPlayFinished:
       Serial.print(F("Number:"));
       Serial.print(value);
@@ -134,5 +115,5 @@ void printDetail(uint8_t type, int value){
     default:
       break;
   }
-  
+
 }
