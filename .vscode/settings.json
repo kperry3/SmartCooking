@@ -1,4 +1,9 @@
 {
     "particle.firmwareVersion": "5.8.0",
-    "cmake.configureOnOpen": true
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "__config": "cpp",
+        "typeinfo": "cpp"
+    },
+    "particle.targetDevice": ""
 }

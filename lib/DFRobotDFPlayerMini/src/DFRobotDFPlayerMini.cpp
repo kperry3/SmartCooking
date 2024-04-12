@@ -82,7 +82,7 @@ void DFRobotDFPlayerMini::disableACK(){
 bool DFRobotDFPlayerMini::waitAvailable(){
   _isSending = true;
   while (!available());
-  return _handleType != TimeOut;
+ return _handleType != TimeOut;
 }
 
 bool DFRobotDFPlayerMini::begin(Stream &stream, bool isACK){
@@ -203,6 +203,7 @@ bool DFRobotDFPlayerMini::available(){
       Serial.print(_received[_receivedIndex],HEX);
       Serial.print(F(" "));
 #endif
+
       if (_received[Stack_Header] == 0x7E) {
         _isAvailable = false;
         _receivedIndex ++;
@@ -302,7 +303,7 @@ void DFRobotDFPlayerMini::sleep(){
 }
 
 void DFRobotDFPlayerMini::reset(){
-  sendStack(0x0C);
+   sendStack(0x0C);
 }
 
 void DFRobotDFPlayerMini::start(){
