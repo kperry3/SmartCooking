@@ -6,10 +6,13 @@
  */
 #include "SmartCooking.h"
 
-SYSTEM_THREAD(ENABLED);
+//SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(AUTOMATIC);
 
 void setup () {
+  // sync time
+  Time.zone(TIMEZONE);
+  Particle.syncTime();
 
   // Connect to the internet
   WiFi.on();
@@ -18,10 +21,6 @@ void setup () {
       Serial.printf(".");
   }
   Serial.printf("\n\n\n");
-
-  // sync time
-  Time.zone(TIMEZONE);
-  Particle.syncTime();
 
   // Setup watchdog timer - NOT working when we go to sleep
  // wd = new ApplicationWatchdog(60000, watchdogHandler , 1536);
@@ -38,6 +37,9 @@ void setup () {
   pinMode(OVENRELAY, OUTPUT);
   digitalWrite(OVENRELAY, LOW); // Make sure Oven is off
 
+  //Initialize hall sensor
+  pinMode(HALLPIN, INPUT);
+
   //Initialize mp3 player
   Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
 
@@ -52,6 +54,7 @@ void setup () {
   Serial.println(F("DFPlayer Mini online."));
 
   myDFPlayer.volume(30);  //Set volume value. From 0 to 30
+  playClip(8);
 
   //Initialize NFC controller
   Serial.print("Initializing NFC Controller");
@@ -84,17 +87,11 @@ void loop () {
     Serial.printf("On/off button pressed: %i!!\n\n", buttonFlag);
     if(buttonFlag == LOW){
       buttonFlag = HIGH;
+      status = READY;
      }else{
       buttonFlag = LOW;
+      status = SHUTDOWN;
     }
-    tempToHigh = false;
-    status = SHUTDOWN;
-  }
-
-  if(nfcRead(&ci)){
-    // There has been an error need to scan card again
-    playClip(6);
-    playClip(7);
   }
 
   MQTT_connect();
@@ -103,86 +100,117 @@ void loop () {
   getAdafruitSubscription(status);
 
   switch(status){
+    case READY:
+      //Just sitting here waiting until we get a recipe
+      pixelFill(0,PIXELCOUNT, green);
+      if(!notificationFlag){
+        displayNotification("System Ready");
+        notificationFlag = true;
+        playClip(9);
+      }
+
+      if(nfcRead(&ci, &status, &notificationFlag)){
+        // There has been an error need to scan card again
+        playClip(6);
+        playClip(7);
+      }
+      break;
     case SHUTDOWN:
-     
+      // Only come in here if we are going to sleep
       Serial.printf("Status is Shut Down\n"); 
       pixelFill(0, PIXELCOUNT, blue);
-      displayNotification("System Off");
+      if(!notificationFlag){
+        displayNotification("Oven Off");
+        notificationFlag = true;
+      }
 
-      if(tempToHigh == false && buttonFlag == LOW){
-        digitalWrite(OVENRELAY, LOW);
-        sleepULP(status);
-      }else if(tempToHigh == true){
-        digitalWrite(OVENRELAY, LOW);
-      }
-      // monitor temp only want to monitor if previous status is waiting for food in or cooking
-      if(previousStatus == COOKING || previousStatus == WAITINGFORFOODIN){
-         tempF = temperatureRead();
-         if(tempF <= ci.cookTemp + TEMPOFFSET){
-         status = previousStatus;
-      }
-    }
+      //Make sure the oven is off to be safe
+      digitalWrite(OVENRELAY, LOW);
+      sleepULP(status);
+      status = READY;
+      notificationFlag = false;
       break;
     case HEATING:
-      displayNotification("Oven Heating");
+      if(!notificationFlag){
+        displayNotification("Oven Heating");
+        notificationFlag = true;
+        digitalWrite(OVENRELAY, HIGH);
+          // Send status/email to adafruit 
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+          previousStatus = status;
+        }   
+       }
       Serial.printf("Oven Heating\n\n");
       // Turn on oven
-      digitalWrite(OVENRELAY, HIGH);
       pixelFill(0, PIXELCOUNT, yellow);
-       //   Send status/email to adafruit  NOT GOING TO WORK NEED TO CHANGE tHIS!!
-      if(previousStatus != status){
-          if(mqtt.Update()) {
-           smartCookerStatus.publish(status);
-           previousStatus = status;
-          }   
-       }
+ 
       tempF = temperatureRead();
       if(tempF >= ci.cookTemp){
-        previousStatus = COOKING;
         status = WAITINGFORFOODIN;
+        notificationFlag = false;
         reminder++;
         waitTimer.startTimer(WAITTIME);
-        playClip(2);
+       playClip(6);
+       playClip(2);
       }
       break;
     case WAITINGFORFOODIN:
       playClip(6);
       pixelFill(0, PIXELCOUNT, orange);
+      if(!notificationFlag){
+          //  First time through Send status/email to adafruit
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+          previousStatus = status;
+        }   
+
+      }
       displayNotification("Put food in the oven", tempF);
-         Serial.printf("Temp: %0.2f\n",  tempF);
+      Serial.printf("Temp: %0.2f\n",  tempF);
+      doorOpen = digitalRead(HALLPIN);
+      Serial.printf("Door open value: %d\n", doorOpen);
+ 
       if(waitTimer.isTimerReady()){
         if(reminder <= NUMOFREMINDERS){
-          reminder++;
           playClip(2);
+          reminder++;
           waitTimer.startTimer(WAITTIME);
         }
         else{
           status = SHUTDOWN;
-          tempToHigh = false;
-          buttonFlag = LOW;
+          notificationFlag = false;
           reminder = 0;
-        }
-      } else {  
-        tempF = temperatureRead();
-        if(tempF > ci.cookTemp + TEMPOFFSET){
-          previousStatus = WAITINGFORFOODIN;
-          status = SHUTDOWN;
-          tempToHigh = true;
-        }else if(tempF <= ci.cookTemp){
-          // Person put the food in the oven??? start cooking timer
-          status = COOKING;
-          cookTimer.startTimer(ci.cookTime - COOLINGTEMPTIME);
-        }
+        }  
       }
+      tempF = temperatureRead();
 
-       //  First time through Send status/email to adafruit
+      if(!doorOpen) {  
+          notificationFlag = false;
+          status = COOKING;
+          cookTimer.startTimer(ci.cookTime - COOLINGTEMPTIME);  // Food is in the oven start cooking
+      } else{
+          if(tempF >= (ci.cookTemp + TEMPOFFSET)){ // Need to keep monitoring the temp while waiting so oven doesn't get too hot
+            digitalWrite(OVENRELAY, LOW);
+          }
+          else {
+            digitalWrite(OVENRELAY, HIGH);
+          }
+      } 
       Serial.printf("Status is Waiting for Food In\n");
       break;
     case COOKING:
       pixelFill(0, PIXELCOUNT, red);
 
       displayNotification("Food Cooking, Temp: ", tempF);
-       //  Send status/email to adafruit
+      if(!notificationFlag){
+                 //  Send status/email to adafruit
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+          previousStatus = status;
+        }   
+
+      }
       if(cookTimer.isTimerReady()){
         // Food is done cooking
         digitalWrite(OVENRELAY, LOW);
@@ -190,54 +218,71 @@ void loop () {
         playClip(5);
         waitTimer.startTimer(WAITTIME);
         status = COOLING;
-        previousStatus = SHUTDOWN;  //  We don't need this anymore so set back to default setting.????
+        notificationFlag = false;
       }else{
         tempF = temperatureRead();
-        if(tempF > ci.cookTemp + TEMPOFFSET){
-        previousStatus = COOKING;
-        status = SHUTDOWN;
-        tempToHigh = true;
-        }         
+        if(tempF > (ci.cookTemp + TEMPOFFSET)){
+          digitalWrite(OVENRELAY, LOW);
+        }  
+        else{
+          digitalWrite(OVENRELAY, HIGH);
+        }       
       }
-      Serial.printf("Status is Cooking\n");
+      Serial.printf("Status is Cooking, Temp: %0.2f\n", tempF);
        break;
     case COOLING:
       pixelFill(0, PIXELCOUNT, indigo);
-      displayNotification("Food is Cooling");
-          // Send status/email to adafruit
-      if(coolTimer.isTimerReady()){
+      if(!notificationFlag){
+                  // Send status/email to adafruit
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+          previousStatus = status;
+        }   
+
+        displayNotification("Food is Cooling");
+        notificationFlag = true;
+      }
+     if(coolTimer.isTimerReady()){
         reminder++;
         status=WAITINGFORFOODOUT;
+        notificationFlag = false;
         waitTimer.startTimer(WAITTIME);
       }
 
-    // Send status to adafruit
-      Serial.printf("Status is Cooling\n");
+       Serial.printf("Status is Cooling\n");
        break;
     case WAITINGFORFOODOUT:
       pixelFill(0, PIXELCOUNT, violet);
-      displayNotification("Take Food Out of the Oven");
-      playClip(6);
-
+      if(!notificationFlag){
+       displayNotification("Take Food Out of the Oven");
+       notificationFlag = true;
     // Send status/email to adafruit
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+          previousStatus = status;
+        }   
+      }
+      playClip(6);
+      doorOpen = digitalRead(HALLPIN);
+ 
     if(waitTimer.isTimerReady()){
       if(reminder <= NUMOFREMINDERS){
         reminder++;
         playClip(5);
         waitTimer.startTimer(WAITTIME);
-      }else{
+      }else {
         // put the system to sleep
-        tempToHigh = false;
-        buttonFlag = LOW;
         status = SHUTDOWN;
+        notificationFlag = false;
+        reminder = 0;
      }
-    }else{
-        tempF = temperatureRead();
-        if(tempF < ci.cookTemp - TEMPOFFSET){ // Temp taken out of oven???
-          status = SHUTDOWN;
-     }         
-    }
-    // Send status to adafruit
+    }else if(doorOpen){
+        // put the system to sleep
+        status = SHUTDOWN;
+        notificationFlag = false;
+        reminder = 0;
+     }  
+
       Serial.printf("Status is Waiting for Food Out\n");
       break;
   }
@@ -267,7 +312,7 @@ void displayNotification(String message, float temp) {
   display.setTextColor(WHITE);
   display.setCursor(0,0);
   Serial.printf("timestamp: %s\n", timeStamp.c_str());
-  if(temp=0){
+  if(temp==0){
     display.printf("%s\nTime: %s ", message.c_str(), timeStamp.c_str());
  
   }else{
@@ -276,7 +321,7 @@ void displayNotification(String message, float temp) {
  display.display();
 }
 
-bool nfcRead(struct cookingInstructions* cookingStruct){
+bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, bool *notification){
   if (nfc.scan()) {
     if (nfc.readData(dataNameRead, RECIPENAMEBLOCK) != 1) {
       Serial.print("Block ");
@@ -312,10 +357,14 @@ bool nfcRead(struct cookingInstructions* cookingStruct){
       Serial.printf("Recipe Time: %i\n", cookingStruct->cookTime);
     }
     delay(500);
-    status=HEATING;
+
+    *status=HEATING;
+    *notification = false;
     playClip(1);
-    cookingStruct->cookTemp = 100;  // TESTING NEED TO DELETE THIS
-    cookingStruct->cookTime = .3;
+    
+    // TESTING NEED TO DELETE THIS
+    cookingStruct->cookTime = 30000; // Cook for 5 minutes
+    cookingStruct->cookTemp = cookingStruct->cookTemp - 50; // might want to keep this
   }  
   return false;
 }
@@ -461,11 +510,6 @@ void playClip(int trackNumber){
   Serial.printf("read state: %i\n",myDFPlayer.readState());
     myDFPlayer.play(trackNumber);
     delay(6000);  
-}
-
-void nfcHandler(){
-  Serial.print("Card read\n");
-  nfcRead(&ci);
 }
 
 void getAdafruitSubscription(systemStatus status){

@@ -13,6 +13,7 @@
 
 const int TIMEZONE = -4;
 const int ONOFFBUTTON = D11;
+const int HALLPIN = D19;
 const int OVENRELAY = D4;
 const int OLED_RESET= -1;
 const int TEXTSIZE = 1;
@@ -58,7 +59,8 @@ struct cookingInstructions {
 };
 
 enum systemStatus {
-  SHUTDOWN = 27,
+  READY = 27,
+  SHUTDOWN,
   HEATING,
   WAITINGFORFOODIN,
   COOKING,
@@ -82,8 +84,8 @@ struct cookingInstructions ci;
 ApplicationWatchdog *wd;
 bool tempToHigh = TRUE;
 uint8_t tempStatus;
-systemStatus status = SHUTDOWN;
-systemStatus previousStatus = SHUTDOWN;
+systemStatus status = READY;
+systemStatus previousStatus = READY;
 int reminder = 0;
 float tempC, tempF;
 String message;
@@ -93,9 +95,10 @@ uint8_t dataTimeRead[16] = {0};
 uint8_t dataWriteName[BLOCK_SIZE] = {"Mac & Cheese"};
 uint8_t dataWriteTemp[BLOCK_SIZE] = {"350"};
 uint8_t dataWriteTime[BLOCK_SIZE] = {"40"};
-int vol;
-int subValue;
-int buttonFlag = HIGH;
+int vol, subValue, buttonFlag = HIGH;
+bool notificationFlag = false;
+int doorOpen = LOW;
+
 
 /************Declare Functions*************/
 void sleepULP(systemStatus status);
@@ -104,11 +107,10 @@ bool MQTT_ping();
 void getConc() ;
 void pixelFill(int startPixel, int endPixel, int hexColor, bool clear=false);
 void displayNotification(String message, float temp=0);
-bool nfcRead(struct cookingInstructions* cookingStruct);
+bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, bool *notification);
 void nfcWrite();
 float temperatureRead();
 void watchdogHandler();
 void watchdogCheckin();
 void playClip(int trackNumber);
-void nfcHandler();
 void getAdafruitSubscription(systemStatus status);
