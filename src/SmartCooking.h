@@ -25,7 +25,7 @@ const int POLLING = 0;
 const int RECIPENAMEBLOCK = 1;
 const int RECIPETEMPBLOCK = 2;
 const int RECIPETIMEBLOCK = 4;
-const int WATCHDOGTIMER = 300000; //120*60000;  // Every two hours
+const int WATCHDOGTIMER = 50000;
 const int WAITTIME = 20000;//10*60000; //Remind every 10 minutes
 const int COOLINGTEMPTIME = 5000;//15*6000;  // Has to be in ms
 const int NUMOFREMINDERS = 3; // Three reminders before the system shuts down
@@ -37,10 +37,11 @@ DFRobot_PN532_IIC  nfc(PN532_IRQ, POLLING);
 Adafruit_SSD1306 display(OLED_RESET);
 Adafruit_NeoPixel pixel(PIXELCOUNT, SPI1, WS2812B);
 Button onOffButton(ONOFFBUTTON);
-IoTTimer cookTimer, coolTimer, waitTimer;
+IoTTimer cookTimer, coolTimer, waitTimer, wdTimer;
 MAX6675 thermocouple;
 DFRobotDFPlayerMini myDFPlayer;
 TCPClient TheClient;
+ApplicationWatchdog *wd;
 
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and
 // login details.
@@ -67,6 +68,11 @@ enum systemStatus {
   COOLING,
   WAITINGFORFOODOUT
 };
+cookingInstructions recipes[5] = {{ "Lasagna", 375, 40 },
+                                 { "Baked Chicken", 350, 36 },
+                                 {"Mac & Cheese", 350, 36 }, 
+                                 {"Salsbury Steak and Mac & Cheese", 350, 35 },
+                                 {"Roasted Turkey", 350, 35 }};
 
 enum remoteControl {
   DECVOL = 0,
@@ -79,9 +85,10 @@ enum remoteControl {
   TURKEY = 21
 };
 
+//Hard coded recipes for remote cooking
+
 // Variables
 struct cookingInstructions ci;
-ApplicationWatchdog *wd;
 bool tempToHigh = TRUE;
 uint8_t tempStatus;
 systemStatus status = READY;
@@ -92,9 +99,6 @@ String message;
 uint8_t dataNameRead[16] = {0};
 uint8_t dataTempRead[16] = {0};
 uint8_t dataTimeRead[16] = {0};
-uint8_t dataWriteName[BLOCK_SIZE] = {"Mac & Cheese"};
-uint8_t dataWriteTemp[BLOCK_SIZE] = {"350"};
-uint8_t dataWriteTime[BLOCK_SIZE] = {"40"};
 int vol, subValue, buttonFlag = HIGH;
 bool notificationFlag = false;
 int doorOpen = LOW;
@@ -108,9 +112,8 @@ void getConc() ;
 void pixelFill(int startPixel, int endPixel, int hexColor, bool clear=false);
 void displayNotification(String message, float temp=0);
 bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, bool *notification);
-void nfcWrite();
 float temperatureRead();
 void watchdogHandler();
 void watchdogCheckin();
 void playClip(int trackNumber);
-void getAdafruitSubscription(systemStatus status);
+void getAdafruitSubscription(systemStatus status, struct cookingInstructions* cookingStruct);
