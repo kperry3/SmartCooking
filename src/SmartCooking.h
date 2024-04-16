@@ -29,7 +29,7 @@ const int WATCHDOGTIMER = 50000;
 const int WAITTIME = 20000;//10*60000; //Remind every 10 minutes
 const int COOLINGTEMPTIME = 5000;//15*6000;  // Has to be in ms
 const int NUMOFREMINDERS = 3; // Three reminders before the system shuts down
-const int TEMPOFFSET = 5; // NOT sure about this need to test
+const int TEMPOFFSET = 10; // NOT sure about this need to test
 
 // Declare Objects
 //Timer timer(1000, watchdogCheckin);
@@ -92,7 +92,6 @@ struct cookingInstructions ci;
 bool tempToHigh = TRUE;
 uint8_t tempStatus;
 systemStatus status = READY;
-systemStatus previousStatus = READY;
 int reminder = 0;
 float tempC, tempF;
 String message;
@@ -102,7 +101,6 @@ uint8_t dataTimeRead[16] = {0};
 int vol, subValue, buttonFlag = HIGH;
 bool notificationFlag = false;
 int doorOpen = LOW;
-
 
 /************Declare Functions*************/
 void sleepULP(systemStatus status);

@@ -99,9 +99,10 @@ void loop () {
 
   switch(status){
     case READY:
+      Serial.printf("System Ready\n\n");
       //Just sitting here waiting until we get a recipe
-      pixelFill(0,PIXELCOUNT, green);
-      if(!notificationFlag){
+     if(!notificationFlag){
+        pixelFill(0,PIXELCOUNT, green);
         displayNotification("System Ready");
         notificationFlag = true;
         playClip(9);
@@ -116,8 +117,8 @@ void loop () {
     case SHUTDOWN:
       // Only come in here if we are going to sleep
       Serial.printf("Status is Shut Down\n");
-      pixelFill(0, PIXELCOUNT, blue);
       if(!notificationFlag){
+        pixelFill(0, PIXELCOUNT, blue);
         displayNotification("Oven Off");
         notificationFlag = true;
       }
@@ -129,20 +130,18 @@ void loop () {
       notificationFlag = false;
       break;
     case HEATING:
+      Serial.printf("Oven Heating\n\n");
       if(!notificationFlag){
+        pixelFill(0, PIXELCOUNT, yellow);
         displayNotification("Oven Heating");
         notificationFlag = true;
         digitalWrite(OVENRELAY, HIGH);
           // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
-          previousStatus = status;
         }
+        notificationFlag = true;
        }
-      Serial.printf("Oven Heating\n\n");
-      // Turn on oven
-      pixelFill(0, PIXELCOUNT, yellow);
-
       tempF = temperatureRead();
       if(tempF >= ci.cookTemp){
         status = WAITINGFORFOODIN;
@@ -154,59 +153,61 @@ void loop () {
       }
       break;
     case WAITINGFORFOODIN:
+      Serial.printf("Status is Waiting for Food In, temp: %f\n", tempF);
       playClip(6);
-      pixelFill(0, PIXELCOUNT, orange);
       if(!notificationFlag){
+        pixelFill(0, PIXELCOUNT, orange);
           //  First time through Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
-          previousStatus = status;
         }
+        notificationFlag = true;
       }
+      
+      // Want to keep displaying so we can visually monitor the temp if needed
       displayNotification("Put food in the oven", tempF);
-      Serial.printf("Temp: %0.2f\n",  tempF);
       doorOpen = digitalRead(HALLPIN);
-      Serial.printf("Door open value: %d\n", doorOpen);
-
-      if(waitTimer.isTimerReady()){
-        if(reminder < NUMOFREMINDERS){
-          playClip(2);
-          reminder++;
-          waitTimer.startTimer(WAITTIME);
-        }
-        else{
-          status = SHUTDOWN;
-          notificationFlag = false;
-          reminder = 0;
-        }
-      }
-      tempF = temperatureRead();
 
       if(!doorOpen) {
           notificationFlag = false;
           status = COOKING;
           cookTimer.startTimer(ci.cookTime - COOLINGTEMPTIME);  // Food is in the oven start cooking
+          playClip(3);
+          break;
       } else{
-          if(tempF >= (ci.cookTemp + TEMPOFFSET)){ // Need to keep monitoring the temp while waiting so oven doesn't get too hot
+         if(waitTimer.isTimerReady()){
+           if(reminder < NUMOFREMINDERS){
+             playClip(2);
+              reminder++;
+              waitTimer.startTimer(WAITTIME);
+            }
+           else{
+              status = SHUTDOWN;
+              notificationFlag = false;
+             reminder = 0;
+            }
+          }          
+          tempF = temperatureRead();
+
+          if(tempF >= (ci.cookTemp)){ // Need to keep monitoring the temp while waiting so oven doesn't get too hot
             digitalWrite(OVENRELAY, LOW);
           }
           else if(tempF < (ci.cookTemp - TEMPOFFSET)){
             digitalWrite(OVENRELAY, HIGH);
           }
       }
-      Serial.printf("Status is Waiting for Food In\n");
       break;
     case COOKING:
-      pixelFill(0, PIXELCOUNT, red);
+      Serial.printf("Status is Cooking, Temp: %0.2f\n", tempF);
       // We need to keep displaying notification so we can visually monitor the temp
       displayNotification("Food Cooking, Temp: ", tempF);
       if(!notificationFlag){
+        pixelFill(0, PIXELCOUNT, red);
         // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
-          previousStatus = status;
         }
-
+        notificationFlag = true;
       }
       if(cookTimer.isTimerReady()){
         // Food is done cooking
@@ -218,22 +219,21 @@ void loop () {
         notificationFlag = false;
       }else{
         tempF = temperatureRead();
-        if(tempF > (ci.cookTemp + TEMPOFFSET)){
+        if(tempF > (ci.cookTemp)){
           digitalWrite(OVENRELAY, LOW);
         }
         else if(tempF < (ci.cookTemp - TEMPOFFSET)){
           digitalWrite(OVENRELAY, HIGH);
         }
       }
-      Serial.printf("Status is Cooking, Temp: %0.2f\n", tempF);
-       break;
+      break;
     case COOLING:
-      pixelFill(0, PIXELCOUNT, indigo);
+      Serial.printf("Status is Cooling\n");
       if(!notificationFlag){
-                  // Send to adafruit
+        pixelFill(0, PIXELCOUNT, indigo);
+        // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
-          previousStatus = status;
         }
 
         displayNotification("Food is Cooling");
@@ -245,43 +245,40 @@ void loop () {
         notificationFlag = false;
         waitTimer.startTimer(WAITTIME);
       }
-
-       Serial.printf("Status is Cooling\n");
-       break;
+      break;
     case WAITINGFORFOODOUT:
-      pixelFill(0, PIXELCOUNT, violet);
+      Serial.printf("Status is Waiting for Food Out\n");
       if(!notificationFlag){
+        pixelFill(0, PIXELCOUNT, violet);
         displayNotification("Take Food Out of the Oven");
         notificationFlag = true;
         // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
-          previousStatus = status;
         }
       }
       playClip(6);
       doorOpen = digitalRead(HALLPIN);
 
-    if(waitTimer.isTimerReady()){
-      if(reminder < NUMOFREMINDERS){
-        reminder++;
-        playClip(5);
-        waitTimer.startTimer(WAITTIME);
-      }else {
+      if(doorOpen){
         // put the system to sleep
         status = SHUTDOWN;
         notificationFlag = false;
         reminder = 0;
-     }
-    }else if(doorOpen){
-        // put the system to sleep
-        status = SHUTDOWN;
-        notificationFlag = false;
-        reminder = 0;
-     }
-
-      Serial.printf("Status is Waiting for Food Out\n");
-      break;
+        break;
+      }if(waitTimer.isTimerReady()){
+        if(reminder < NUMOFREMINDERS){
+          reminder++;
+          playClip(5);
+         waitTimer.startTimer(WAITTIME);
+        }else {
+          // put the system to sleep
+          status = SHUTDOWN;
+          notificationFlag = false;
+          reminder = 0;
+        }
+    } 
+    break;
   }
 }
 
@@ -333,7 +330,7 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
        return true;
     }
     else {
-      cookingStruct->cookTemp = atoi((char*)dataTempRead);
+      cookingStruct->cookTemp = (atoi((char*)dataTempRead) - 150);
       Serial.printf("Recipe Temp: %i\n", cookingStruct->cookTemp);
     }
     if (nfc.readData(dataTimeRead, RECIPETIMEBLOCK) != 1) {
@@ -341,7 +338,7 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
       return true;
    }
     else {
-      cookingStruct->cookTime = atoi((char*)dataTimeRead) * 6000; // Need to convert to ms
+      cookingStruct->cookTime = atoi((char*)dataTimeRead) * 60000; // Need to convert to ms
       Serial.printf("Recipe Time: %i\n", cookingStruct->cookTime);
     }
     delay(500);
@@ -349,10 +346,6 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
     *status=HEATING;
     *notification = false;
     playClip(1);
-
-    // TESTING NEED TO DELETE THIS
-    cookingStruct->cookTime = 102000; // Cook for 5 minutes
-    cookingStruct->cookTemp = 320;
   
   }
   return false;
@@ -363,7 +356,7 @@ float temperatureRead(){
   // Monitor Temperature of Oven
   tempStatus = thermocouple.read();
   if (tempStatus != STATUS_OK) {
-    Serial.printf("ERROR!\n");
+    Serial.printf("temperatureRead ERROR!\n");
   }
 
   tempC = thermocouple.getTemperature();

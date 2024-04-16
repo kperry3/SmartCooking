@@ -7,6 +7,7 @@ This firmware project was created using [Particle Developer Tools](https://www.p
 - [Introduction](#introduction)
 - [Prerequisites To Use This Template](#prerequisites-to-use-this-repository)
 - [Getting Started](#getting-started) 
+- [Voice Notifications](#voice-notifications)
 - [Auto Cad Design](#Auto-Cad-Design) 
 - [Schematic](#Schematic)
 - [Fritzing Diagram](#Fitzing-Diagram)
@@ -55,18 +56,26 @@ To use this software you'll need:
     ```
     particle serial monitor --follow
     ```
-
+## Voice Notifications
+- Track 1: Wait for oven to heat up
+- Track 2: Put the food in the oven
+- Track 3: The food is cooking 
+- Track 4: Food is cooling
+- Track 5: Take food out of the oven
+- Track 6: Reminder tone
+- Track 7: You can now scan the recipe card
+- Track 8: Wait to scan the recipe until the lights turn green
 
 ## Auto Cad Design
-3D model of the flower pot
+3D model of the smart cooker case
 
-<img src="HousePlantWaterSys/images/flower_pot.gif" width=500 height=350>
+<img src="images/smart-cooker-case.png" width=500 height=350>
 
 ## Schematic
-<img src="HousePlantWaterSys/images/schematic.png" width=500 height=450>
+<img src="images/schematic.png" width=500 height=450>
 
 ## Fitzing Diagram
-<img src="HousePlantWaterSys/images/fritzing.png" width=500 height=450>
+<img src="images/fritzing-diagram.png" width=500 height=450>
 
 ## About Me
 
