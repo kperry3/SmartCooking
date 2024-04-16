@@ -2,7 +2,9 @@
  * Project Perry3000 Smart Cooker
  * Author: Kathryn Perry
  * Date: April 4, 2024
- * Description:
+ * Description: This program automates the process of cooking a meal.  It takes as input an NFC Recipe Card or a command 
+ *              from Adafruit and then goes through the process of cooking a meal. The cooking process consists of heating, 
+ *              cooking, and cooling while directing the user at each step. For more information see the readme file
  */
 #include "SmartCooking.h"
 
@@ -414,7 +416,7 @@ void sleepULP(systemStatus status){
   SystemSleepConfiguration config;
   config.mode(SystemSleepMode::ULTRA_LOW_POWER).gpio(D11, CHANGE);
   SystemSleepResult result = System.sleep(config);
-  delay(1000);
+  //delay(1000);
 
   if(result.wakeupReason() == SystemSleepWakeupReason::BY_GPIO){
     Serial.printf("We just woke up\n");
