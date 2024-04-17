@@ -68,8 +68,8 @@ enum systemStatus {
   COOLING,
   WAITINGFORFOODOUT
 };
-cookingInstructions recipes[5] = {{ "Lasagna", 375, 40 },
-                                 { "Baked Chicken", 350, 36 },
+cookingInstructions recipes[5] = {{"Lasagna", 375, 40 },
+                                 {"Baked Chicken", 350, 36 },
                                  {"Mac & Cheese", 350, 36 }, 
                                  {"Salsbury Steak and Mac & Cheese", 350, 35 },
                                  {"Roasted Turkey", 350, 35 }};

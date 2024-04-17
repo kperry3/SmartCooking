@@ -341,7 +341,7 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
        return true;
     }
     else {
-      cookingStruct->cookTemp = (atoi((char*)dataTempRead) - 150);
+      cookingStruct->cookTemp = (atoi((char*)dataTempRead) - 150); // Had to subtract from temperature to compensate for a faulty thermocouple
       Serial.printf("Recipe Temp: %i\n", cookingStruct->cookTemp);
     }
     if (nfc.readData(dataTimeRead, RECIPETIMEBLOCK) != 1) {
