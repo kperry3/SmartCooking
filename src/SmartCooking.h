@@ -25,11 +25,11 @@ const int POLLING = 0;
 const int RECIPENAMEBLOCK = 1;
 const int RECIPETEMPBLOCK = 2;
 const int RECIPETIMEBLOCK = 4;
-const int WATCHDOGTIMER = 50000;
-const int WAITTIME = 20000;//10*60000; //Remind every 10 minutes
+
+const int WAITTIME = 10*60000; //Remind every 10 minutes
 const int COOLINGTEMPTIME = 15*60000;  // Has to be in ms
 const int NUMOFREMINDERS = 3; // Three reminders before the system shuts down
-const int TEMPOFFSET = 10; // NOT sure about this need to test
+const int TEMPOFFSET = 5; 
 
 // Declare Objects
 //Timer timer(1000, watchdogCheckin);
@@ -114,4 +114,4 @@ float temperatureRead();
 void watchdogHandler();
 void watchdogCheckin();
 void playClip(int trackNumber);
-void getAdafruitSubscription(systemStatus status, struct cookingInstructions* cookingStruct);
+void getAdafruitSubscription(systemStatus *status, struct cookingInstructions* cookingStruct, bool *notification);

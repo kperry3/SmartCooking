@@ -8,6 +8,7 @@
  */
 #include "SmartCooking.h"
 
+SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(AUTOMATIC);
 
 void setup () {
@@ -50,7 +51,6 @@ void setup () {
     }
   }
   Serial.println(F("DFPlayer Mini online."));
-
   myDFPlayer.volume(30);  //Set volume value. From 0 to 30
   playClip(8);
 
@@ -77,6 +77,10 @@ void setup () {
 
   // Setup MQTT subscription
   mqtt.subscribe(&smartCookerRemote);
+
+  // Get data from Adafruit
+   // new Thread("adafruitData", getAdafruitSubscription);
+
 }
 
 void loop () {
@@ -95,7 +99,7 @@ void loop () {
   MQTT_connect();
   MQTT_ping();
 
-  getAdafruitSubscription(status, &ci);
+  getAdafruitSubscription(&status, &ci, &notificationFlag);
 
   switch(status){
     case READY:
@@ -105,6 +109,10 @@ void loop () {
         pixelFill(0,PIXELCOUNT, green);
         displayNotification("System Ready");
         notificationFlag = true;
+        // Send to adafruit
+        if(mqtt.Update()) {
+          smartCookerStatus.publish(status);
+        }
         playClip(9);
       }
 
@@ -134,6 +142,7 @@ void loop () {
       if(!notificationFlag){
         pixelFill(0, PIXELCOUNT, yellow);
         displayNotification("Oven Heating");
+        playClip(1);
         notificationFlag = true;
         digitalWrite(OVENRELAY, HIGH);
           // Send to adafruit
@@ -146,17 +155,18 @@ void loop () {
       if(tempF >= ci.cookTemp){
         status = WAITINGFORFOODIN;
         notificationFlag = false;
-        reminder++;
         waitTimer.startTimer(WAITTIME);
-       playClip(6);
-       playClip(2);
-      }
+       }
       break;
     case WAITINGFORFOODIN:
       Serial.printf("Status is Waiting for Food In, temp: %f\n", tempF);
+      // Want to keep displaying so we can visually monitor the temp if needed
+      displayNotification("Put food in the oven", tempF);
       playClip(6);
       if(!notificationFlag){
+        reminder++;
         pixelFill(0, PIXELCOUNT, orange);
+        playClip(2);
           //  First time through Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
@@ -164,27 +174,24 @@ void loop () {
         notificationFlag = true;
       }
       
-      // Want to keep displaying so we can visually monitor the temp if needed
-      displayNotification("Put food in the oven", tempF);
       doorOpen = digitalRead(HALLPIN);
 
       if(!doorOpen) {
           notificationFlag = false;
           status = COOKING;
           cookTimer.startTimer(ci.cookTime - COOLINGTEMPTIME);  // Food is in the oven start cooking
-          playClip(3);
           break;
       } else{
          if(waitTimer.isTimerReady()){
            if(reminder < NUMOFREMINDERS){
-             playClip(2);
+              playClip(2);
               reminder++;
               waitTimer.startTimer(WAITTIME);
             }
            else{
               status = SHUTDOWN;
               notificationFlag = false;
-             reminder = 0;
+              reminder = 0;
             }
           }          
           tempF = temperatureRead();
@@ -203,7 +210,8 @@ void loop () {
       displayNotification("Food Cooking, Temp: ", tempF);
       if(!notificationFlag){
         pixelFill(0, PIXELCOUNT, red);
-        // Send to adafruit
+        playClip(3);
+         // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
         }
@@ -212,8 +220,6 @@ void loop () {
       if(cookTimer.isTimerReady()){
         // Food is done cooking
         digitalWrite(OVENRELAY, LOW);
-        reminder++;
-        playClip(5);
         coolTimer.startTimer(COOLINGTEMPTIME);
         status = COOLING;
         notificationFlag = false;
@@ -231,6 +237,8 @@ void loop () {
       Serial.printf("Status is Cooling\n");
       if(!notificationFlag){
         pixelFill(0, PIXELCOUNT, indigo);
+        reminder++;
+        playClip(4);
         // Send to adafruit
         if(mqtt.Update()) {
           smartCookerStatus.publish(status);
@@ -239,8 +247,8 @@ void loop () {
         displayNotification("Food is Cooling");
         notificationFlag = true;
       }
+
      if(coolTimer.isTimerReady()){
-        reminder++;
         status=WAITINGFORFOODOUT;
         notificationFlag = false;
         waitTimer.startTimer(WAITTIME);
@@ -251,6 +259,9 @@ void loop () {
       if(!notificationFlag){
         pixelFill(0, PIXELCOUNT, violet);
         displayNotification("Take Food Out of the Oven");
+        playClip(6);
+        playClip(5);
+        reminder++;
         notificationFlag = true;
         // Send to adafruit
         if(mqtt.Update()) {
@@ -260,7 +271,7 @@ void loop () {
       playClip(6);
       doorOpen = digitalRead(HALLPIN);
 
-      if(doorOpen){
+      if(!doorOpen){
         // put the system to sleep
         status = SHUTDOWN;
         notificationFlag = false;
@@ -270,7 +281,7 @@ void loop () {
         if(reminder < NUMOFREMINDERS){
           reminder++;
           playClip(5);
-         waitTimer.startTimer(WAITTIME);
+          waitTimer.startTimer(WAITTIME);
         }else {
           // put the system to sleep
           status = SHUTDOWN;
@@ -345,8 +356,9 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
 
     *status=HEATING;
     *notification = false;
-    playClip(1);
-  
+    
+    //TESTING
+    cookingStruct->cookTime = 3*60000;
   }
   return false;
 }
@@ -405,6 +417,8 @@ bool MQTT_ping() {
 void sleepULP(systemStatus status){
   displayNotification("System Turned Off");
   pixelFill(0, PIXELCOUNT, white, true);
+  // Just to be safe
+  digitalWrite(OVENRELAY, LOW);
 
   SystemSleepConfiguration config;
   config.mode(SystemSleepMode::ULTRA_LOW_POWER).gpio(D11, CHANGE);
@@ -420,12 +434,11 @@ void sleepULP(systemStatus status){
 }
 
 void playClip(int trackNumber){
-  Serial.printf("read state: %i\n",myDFPlayer.readState());
     myDFPlayer.play(trackNumber);
     delay(6000);
 }
 
-void getAdafruitSubscription(systemStatus status, struct cookingInstructions* cookingStruct){
+void getAdafruitSubscription(systemStatus *status, struct cookingInstructions* cookingStruct, bool *notification){
   Adafruit_MQTT_Subscribe *subscription;
 
   while ((subscription = mqtt.readSubscription(0))) {
@@ -444,37 +457,47 @@ void getAdafruitSubscription(systemStatus status, struct cookingInstructions* co
           break;
         case SLEEP:
            Serial.printf("Shutting Down\n");
-           sleepULP(status);
+           sleepULP(*status);
           break;
         case LASAGNA:
           Serial.printf("Cooking Lasagna\n");
           cookingStruct->recipeName = recipes[0].cookTime;
           cookingStruct->cookTemp = recipes[0].cookTemp;
           cookingStruct->cookTime = recipes[0].cookTime;
+          *status=HEATING;
+          *notification = false;          
           break;
         case CHICKEN:
          Serial.printf("Cooking Chicken\n");
           cookingStruct->recipeName = recipes[1].cookTime;
           cookingStruct->cookTemp = recipes[1].cookTemp;
           cookingStruct->cookTime = recipes[1].cookTime;
+          *status=HEATING;
+          *notification = false;          
           break;
         case MACCHEESE:
          Serial.printf("Cooking Mac & Cheese\n");
           cookingStruct->recipeName = recipes[2].cookTime;
           cookingStruct->cookTemp = recipes[2].cookTemp;
           cookingStruct->cookTime = recipes[2].cookTime;
-           break;
+          *status=HEATING;
+          *notification = false;          
+          break;
         case STEAK:
         Serial.printf("Cooking Steak\n");
           cookingStruct->recipeName = recipes[3].cookTime;
           cookingStruct->cookTemp = recipes[3].cookTemp;
           cookingStruct->cookTime = recipes[3].cookTime;
+          *status=HEATING;
+          *notification = false;          
           break;
         case TURKEY:
         Serial.printf("Cooking Turkey\n");
           cookingStruct->recipeName = recipes[4].cookTime;
           cookingStruct->cookTemp = recipes[4].cookTemp;
           cookingStruct->cookTime = recipes[4].cookTime;
+          *status=HEATING;
+          *notification = false;          
           break;
       }
     }
