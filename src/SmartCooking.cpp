@@ -356,9 +356,7 @@ bool nfcRead(struct cookingInstructions* cookingStruct, systemStatus * status, b
 
     *status=HEATING;
     *notification = false;
-    
-    //TESTING
-    cookingStruct->cookTime = 3*60000;
+
   }
   return false;
 }
