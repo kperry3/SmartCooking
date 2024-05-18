@@ -117,7 +117,7 @@ void loop () {
       }
 
       if(nfcRead(&ci, &status, &notificationFlag)){
-        // There has been an error need to scan card again
+        /// There has been an error need to scan card again
         playClip(6);
         playClip(7);
       }
@@ -136,7 +136,7 @@ void loop () {
       sleepULP(status);
       status = READY;
       notificationFlag = false;
-      break;
+      break;  
     case HEATING:
       Serial.printf("Oven Heating\n\n");
       if(!notificationFlag){
@@ -160,7 +160,7 @@ void loop () {
       break;
     case WAITINGFORFOODIN:
       Serial.printf("Status is Waiting for Food In, temp: %f\n", tempF);
-      // Want to keep displaying so we can visually monitor the temp if needed
+      /// Want to keep displaying so we can visually monitor the temp if needed
       displayNotification("Put food in the oven", tempF);
       playClip(6);
       if(!notificationFlag){
