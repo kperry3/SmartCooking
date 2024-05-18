@@ -1,4 +1,4 @@
-/*
+/* This project is......
  * Project Perry3000 Smart Cooker
  * Author: Kathryn Perry
  * Date: April 4, 2024

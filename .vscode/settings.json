@@ -5,5 +5,5 @@
         "__config": "cpp",
         "typeinfo": "cpp"
     },
-    "particle.targetDevice": ""
+    "particle.targetPlatform": "p2"
 }
