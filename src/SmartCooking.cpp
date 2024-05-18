@@ -131,7 +131,7 @@ void loop () {
         notificationFlag = true;
       }
 
-      //Make sure the oven is off to be safe
+      /// Make sure the oven is off to be safe
       digitalWrite(OVENRELAY, LOW);
       sleepULP(status);
       status = READY;
